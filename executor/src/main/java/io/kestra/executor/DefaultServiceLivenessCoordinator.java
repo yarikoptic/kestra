@@ -13,6 +13,7 @@ import io.kestra.core.server.*;
 import io.kestra.core.services.LogService;
 import io.kestra.core.services.SkipExecutionService;
 import io.kestra.core.utils.IdUtils;
+import io.kestra.scheduler.VNodeController;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.scheduling.annotation.Scheduled;
@@ -65,6 +66,7 @@ public class DefaultServiceLivenessCoordinator extends AbstractServiceLivenessTa
     private final WorkerJobRunningStateStore workerJobRunningStateStore;
     private final LogService logService;
     private final MetricRegistry metricRegistry;
+    private final VNodeController vNodeController;
 
     // mutable for testing purpose
     String serverId = ServerInstance.INSTANCE_ID;
@@ -92,6 +94,7 @@ public class DefaultServiceLivenessCoordinator extends AbstractServiceLivenessTa
                                              final LogService logService,
                                              final ServerConfig serverConfig,
                                              final MetricRegistry metricRegistry,
+                                             final VNodeController vNodeController,
                                              @Value("${kestra.server.service.purge.retention}") final Duration purgeRetention) {
         super(TASK_NAME, serverConfig);
         this.serviceRegistry = serviceRegistry;
@@ -105,6 +108,7 @@ public class DefaultServiceLivenessCoordinator extends AbstractServiceLivenessTa
         this.lockService = lockService;
         this.metricRegistry = metricRegistry;
         this.purgeRetention = purgeRetention;
+        this.vNodeController = vNodeController;
     }
 
     /**
@@ -134,6 +138,9 @@ public class DefaultServiceLivenessCoordinator extends AbstractServiceLivenessTa
         handleAllServiceInNotRunningState();
 
         maybeDetectAndLogNewConnectedServices();
+        
+        // May reassign scheduler VNodes
+        vNodeController.checkServicesAndRebalanceVNodes();
     }
 
     /**

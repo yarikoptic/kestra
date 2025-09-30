@@ -4,13 +4,11 @@ import io.kestra.core.models.executions.Execution;
 import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
+import io.kestra.core.runners.Scheduler;
 import io.kestra.core.runners.TestMethodScopedWorker;
 import io.kestra.core.runners.Worker;
-import io.kestra.scheduler.AbstractScheduler;
-import io.kestra.core.services.FlowListenersInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.jdbc.runner.JdbcScheduler;
 import io.micronaut.context.ApplicationContext;
 import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
@@ -30,14 +28,14 @@ class TriggerTest {
     private ApplicationContext applicationContext;
 
     @Inject
-    private FlowListenersInterface flowListenersService;
-
-    @Inject
     @Named(QueueFactoryInterface.EXECUTION_NAMED)
     private QueueInterface<Execution> executionQueue;
 
     @Inject
     private LocalFlowRepositoryLoader repositoryLoader;
+    
+    @Inject
+    protected Scheduler scheduler;
 
     @Test
     void trigger() throws Exception {
@@ -46,11 +44,7 @@ class TriggerTest {
 
         // scheduler
         try (
-                AbstractScheduler scheduler = new JdbcScheduler(
-                        this.applicationContext,
-                        this.flowListenersService
-                );
-                Worker worker = applicationContext.createBean(TestMethodScopedWorker.class, IdUtils.create(), 8, null);
+            Worker worker = applicationContext.createBean(TestMethodScopedWorker.class, IdUtils.create(), 8, null);
         ) {
             // wait for execution
             Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
@@ -67,7 +61,7 @@ class TriggerTest {
             receive.blockLast();
         }
     }
-
+    
     @Test
     void trigger_EncryptedBody() throws Exception {
         // mock flow listeners
@@ -75,10 +69,6 @@ class TriggerTest {
 
         // scheduler
         try (
-            AbstractScheduler scheduler = new JdbcScheduler(
-                this.applicationContext,
-                this.flowListenersService
-            );
             Worker worker = applicationContext.createBean(TestMethodScopedWorker.class, IdUtils.create(), 8, null)
         ) {
             // wait for execution

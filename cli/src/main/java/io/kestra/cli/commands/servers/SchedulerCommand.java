@@ -2,7 +2,7 @@ package io.kestra.cli.commands.servers;
 
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.models.ServerType;
-import io.kestra.scheduler.AbstractScheduler;
+import io.kestra.core.runners.Scheduler;
 import io.kestra.core.utils.Await;
 import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Inject;
@@ -30,8 +30,8 @@ public class SchedulerCommand extends AbstractServerCommand {
     @Override
     public Integer call() throws Exception {
         super.call();
-
-        AbstractScheduler scheduler = applicationContext.getBean(AbstractScheduler.class);
+        
+        Scheduler scheduler = applicationContext.getBean(Scheduler.class);
         scheduler.run();
 
         Await.until(() -> !this.applicationContext.isRunning());
