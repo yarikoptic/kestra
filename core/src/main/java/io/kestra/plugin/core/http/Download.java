@@ -60,7 +60,15 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 public class Download extends AbstractHttp implements RunnableTask<Download.Output> {
     @Schema(title = "Should the task fail when downloading an empty file.")
     @Builder.Default
-    private final Property<Boolean> failOnEmptyResponse = Property.ofValue(true);
+    private Property<Boolean> failOnEmptyResponse = Property.ofValue(true);
+
+    @Schema(
+        title = "Name of the file inside the output.",
+        description = """
+            If not provided, the filename will be extracted from the `Content-Disposition` header.
+            If no `Content-Disposition` header, a name would be generated."""
+    )
+    private Property<String> fileName;
 
     public Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
@@ -111,20 +119,22 @@ public class Download extends AbstractHttp implements RunnableTask<Download.Outp
                 }
             }
 
-            String filename = null;
-            if (response.getHeaders().firstValue("Content-Disposition").isPresent()) {
-                String contentDisposition = response.getHeaders().firstValue("Content-Disposition").orElseThrow();
-                filename = filenameFromHeader(runContext, contentDisposition);
-            }
-            if (filename != null) {
-                filename = URLEncoder.encode(filename, StandardCharsets.UTF_8);
+            String rFilename = runContext.render(this.fileName).as(String.class).orElse(null);
+            if (rFilename == null) {
+                if (response.getHeaders().firstValue("Content-Disposition").isPresent()) {
+                    String contentDisposition = response.getHeaders().firstValue("Content-Disposition").orElseThrow();
+                    rFilename = filenameFromHeader(runContext, contentDisposition);
+                    if (rFilename != null) {
+                        rFilename = rFilename.replace(' ', '+');
+                    }
+                }
             }
 
             logger.debug("File '{}' downloaded with size '{}'", from, size);
 
             return Output.builder()
                 .code(response.getStatus().getCode())
-                .uri(runContext.storage().putFile(tempFile, filename))
+                .uri(runContext.storage().putFile(tempFile, rFilename))
                 .headers(response.getHeaders().map())
                 .length(size.get())
                 .build();
